@@ -109,6 +109,10 @@
 #define RDNA1
 #endif
 
+#if defined(__gfx908__) || defined(__gfx90a__)
+#define CDNA
+#endif
+
 #ifndef __has_builtin
     #define __has_builtin(x) 0
 #endif

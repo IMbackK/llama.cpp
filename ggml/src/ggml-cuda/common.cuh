@@ -47,6 +47,10 @@
 #define CC_TURING     750
 #define CC_AMPERE     800
 #define CC_OFFSET_AMD 1000000
+#define CC_GCN4      (CC_OFFSET_AMD + 803)
+#define CC_VEGA      (CC_OFFSET_AMD + 900)
+#define CC_VEGA20    (CC_OFFSET_AMD + 906)
+#define CC_CDNA      (CC_OFFSET_AMD + 908)
 #define CC_RDNA1      (CC_OFFSET_AMD + 1010)
 #define CC_RDNA2      (CC_OFFSET_AMD + 1030)
 #define CC_RDNA3      (CC_OFFSET_AMD + 1100)
