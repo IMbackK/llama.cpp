@@ -592,7 +592,7 @@ static __global__ void flash_attn_stream_k_fixup(
 }
 
 template<int D> // D == head size
-#if !(defined(GGML_USE_HIP)
+#if !defined(GGML_USE_HIP)
 __launch_bounds__(D, 1)
 #endif // !(defined(GGML_USE_HIP)
 static __global__ void flash_attn_combine_results(
