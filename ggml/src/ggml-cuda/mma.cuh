@@ -456,7 +456,7 @@ namespace ggml_cuda_mma {
                                                        ((int64_t *) B.x)[0],
                                                        acc[0],
                                                        0, 0, 0);
-#elif defined(CDNA2) || defined(CDNA)
+#elif defined(CDNA2) || defined(CDNA1)
         acc[0] = __builtin_amdgcn_mfma_i32_16x16x16i8(A.x[0],
                                                       B.x[0],
                                                       acc[0],
@@ -484,7 +484,7 @@ namespace ggml_cuda_mma {
                                                        ((int64_t *) B.x)[0],
                                                        acc[0],
                                                        0, 0, 0);
-#elif defined(CDNA2) || defined(CDNA)
+#elif defined(CDNA2) || defined(CDNA1)
         acc[0] = __builtin_amdgcn_mfma_i32_32x32x8i8(A.x[0],
                                                      B.x[0],
                                                      acc[0],
