@@ -3514,7 +3514,7 @@ static void evaluate_and_capture_cuda_graph(ggml_backend_cuda_context * cuda_ctx
 
                         for (int i = 1; i <= concurrent_event->n_streams; ++i) {
                             cudaStream_t stream = cuda_ctx->stream(cuda_ctx->device, i);
-                            CUDA_CHECK(cudaStreamWaitEvent(stream, concurrent_event->fork_event));
+                            cudaStreamWaitEvent(stream, concurrent_event->fork_event);
                         }
 
                         is_concurrent_event_active = true;

@@ -25,6 +25,7 @@
 #include <cfloat>
 #include <cstdio>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #if defined(GGML_USE_HIP)
