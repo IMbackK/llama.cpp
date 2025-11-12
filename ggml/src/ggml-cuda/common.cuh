@@ -975,11 +975,11 @@ struct ggml_cuda_concurrent_event {
         per_stream_events.resize(n_streams);
 
         for (size_t i = 0; i < per_stream_events.size(); ++i) {
-            cudaEventCreateWithFlags(&per_stream_events[i], cudaEventDisableTiming);
+            CUDA_CHECK(cudaEventCreateWithFlags(&per_stream_events[i], cudaEventDisableTiming));
         }
 
-        cudaEventCreateWithFlags(&fork_event, cudaEventDisableTiming);
-        cudaEventCreateWithFlags(&join_event, cudaEventDisableTiming);
+        CUDA_CHECK(cudaEventCreateWithFlags(&fork_event, cudaEventDisableTiming));
+        CUDA_CHECK(cudaEventCreateWithFlags(&join_event, cudaEventDisableTiming));
     }
 };
 
