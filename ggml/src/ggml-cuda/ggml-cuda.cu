@@ -323,6 +323,7 @@ static ggml_cuda_device_info ggml_cuda_init() {
         }
     }
 
+#if defined(GGML_USE_NCCL) || defined(GGML_USE_RCCL)
     int dev_ids[GGML_CUDA_MAX_DEVICES];
     for (int id = 0; id < info.device_count; ++id) {
         dev_ids[id] = id;
@@ -330,6 +331,7 @@ static ggml_cuda_device_info ggml_cuda_init() {
     NCCL_CHECK(ncclCommInitAll(info.comms, info.device_count, dev_ids));
 
     return info;
+#endif // defined(GGML_USE_NCCL) || defined(GGML_USE_RCCL)
 }
 
 const ggml_cuda_device_info & ggml_cuda_info() {
@@ -1085,7 +1087,7 @@ static const ggml_backend_buffer_type_i ggml_backend_cuda_split_buffer_type_inte
 };
 
 bool ggml_backend_cuda_allreduce_tensor(ggml_backend_t * backends, struct ggml_tensor ** tensors, size_t n_backends) {
-#ifdef GGML_USE_NCCL
+#if defined(GGML_USE_NCCL) || defined(GGML_USE_RCCL)
     const ggml_cuda_device_info info = ggml_cuda_info();
 
     const size_t ne = ggml_nelements(tensors[0]);
@@ -1099,16 +1101,16 @@ bool ggml_backend_cuda_allreduce_tensor(ggml_backend_t * backends, struct ggml_t
 
     return true;
 #else
-#if !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
+#if !defined(GGML_USE_MUSA)
     static bool warning_printed = false;
     if (!warning_printed) {
-        GGML_LOG_WARN("%s: NVIDIA Collective Communications Library (NCCL) is unavailable, multi GPU performance will be suboptimal\n");
+        GGML_LOG_WARN("%s: NVIDIA/ROCm Collective Communications Library (NCCL/RCCL) is unavailable, multi GPU performance will be suboptimal\n");
         warning_printed = true;
     }
     GGML_UNUSED_VARS(backends, tensors, n_backends);
     return false;
-#endif // !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
-#endif // GGML_USE_NCCL
+#endif // !defined(GGML_USE_MUSA)
+#endif // defined(GGML_USE_NCCL) || defined(GGML_USE_RCCL)
 }
 
 ggml_backend_buffer_type_t ggml_backend_cuda_split_buffer_type(int main_device, const float * tensor_split) {
