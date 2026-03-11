@@ -61,7 +61,7 @@ env:
 jobs:
   ubuntu-22-hip-quality-check:
     runs-on: ubuntu-22.04
-    container: rocm/dev-ubuntu-22.04:7.2.0
+    container: rocm/dev-ubuntu-22.04:7.2
     steps:
       - name: Clone
         id: checkout
