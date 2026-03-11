@@ -91,8 +91,9 @@ jobs:
             -DCMAKE_HIP_FLAGS="-Werror" \
             -DCMAKE_BUILD_TYPE=Release
           make -j $(nproc) 2>&1 | tee metrics.log
-          python ./scripts/hip/gcn-cdna-vgpr-check.py metrics.log
+          python ./scripts/hip/gcn-cdna-vgpr-check.py metrics.
+
       - name: Check for major VGPR spills
-        id: cmake_build
+        id: vgpr_check
         run: |
           python ./scripts/hip/gcn-cdna-vgpr-check.py metrics.log
