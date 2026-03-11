@@ -71,7 +71,7 @@ jobs:
         id: depends
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential git cmake rocblas-dev hipblas-dev libssl-dev
+          sudo apt-get install -y build-essential git cmake rocblas-dev hipblas-dev libssl-dev python3
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -90,10 +90,10 @@ jobs:
             -DGGML_HIP_EXPORT_METRICS=ON \
             -DCMAKE_HIP_FLAGS="-Werror" \
             -DCMAKE_BUILD_TYPE=Release
+          cd build
           make -j $(nproc) 2>&1 | tee metrics.log
-          python ./scripts/hip/gcn-cdna-vgpr-check.py metrics.
 
       - name: Check for major VGPR spills
         id: vgpr_check
         run: |
-          python ./scripts/hip/gcn-cdna-vgpr-check.py metrics.log
+          python3 ./scripts/hip/gcn-cdna-vgpr-check.py build/metrics.log
