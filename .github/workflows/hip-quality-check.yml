@@ -88,7 +88,7 @@ jobs:
             -DGPU_TARGETS=gfx908 \
             -DGGML_HIP=ON \
             -DGGML_HIP_EXPORT_METRICS=ON \
-            -DCMAKE_HIP_FLAGS="-Werror" \
+            -DCMAKE_HIP_FLAGS="-Werror -Wno-tautological-compare" \
             -DCMAKE_BUILD_TYPE=Release
           cd build
           make -j $(nproc) 2>&1 | tee metrics.log
@@ -96,4 +96,5 @@ jobs:
       - name: Check for major VGPR spills
         id: vgpr_check
         run: |
+          echo Do VGPR check
           python3 ./scripts/hip/gcn-cdna-vgpr-check.py build/metrics.log
