@@ -87,14 +87,22 @@ jobs:
             -DCMAKE_HIP_COMPILER="$(hipconfig -l)/clang" \
             -DGPU_TARGETS=gfx908 \
             -DGGML_HIP=ON \
-            -DGGML_HIP_EXPORT_METRICS=ON \
+            -DGGML_HIP_EXPORT_METRICS=Off \
             -DCMAKE_HIP_FLAGS="-Werror -Wno-tautological-compare" \
             -DCMAKE_BUILD_TYPE=Release
           cd build
-          make -j $(nproc) 2>&1 | tee metrics.log
+          make -j $(nproc)
 
       - name: Check for major VGPR spills
         id: vgpr_check
         run: |
-          echo Do VGPR check
-          python3 ./scripts/hip/gcn-cdna-vgpr-check.py build/metrics.log
+          cmake -B build -S . \
+            -DCMAKE_HIP_COMPILER="$(hipconfig -l)/clang" \
+            -DGPU_TARGETS=gfx908 \
+            -DGGML_HIP=ON \
+            -DGGML_HIP_EXPORT_METRICS=On \
+            -DCMAKE_HIP_FLAGS="" \
+            -DCMAKE_BUILD_TYPE=Release
+          cd build
+          make -j $(nproc) 2>&1 | tee metrics.log | grep -v 'Rpass-analysis=kernel-resource-usage\|remark:\|^$'
+          python3 ../scripts/hip/gcn-cdna-vgpr-check.py metrics.log
