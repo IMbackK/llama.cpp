@@ -76,11 +76,11 @@ jobs:
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
         with:
-          key: ubuntu-22-cmake-hip
+          key: ubuntu-22-hip-quality-check
           evict-old-files: 1d
           save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
-      - name: Build with native CMake HIP support
+      - name: Build with Werror
         id: cmake_build
         run: |
           cmake -B build -S . \
@@ -90,5 +90,9 @@ jobs:
             -DGGML_HIP_EXPORT_METRICS=ON \
             -DCMAKE_HIP_FLAGS="-Werror" \
             -DCMAKE_BUILD_TYPE=Release
-          make -j $(nproc) 2> metrics.log
+          make -j $(nproc) 2>&1 | tee metrics.log
+          python ./scripts/hip/gcn-cdna-vgpr-check.py metrics.log
+      - name: Check for major VGPR spills
+        id: cmake_build
+        run: |
           python ./scripts/hip/gcn-cdna-vgpr-check.py metrics.log
