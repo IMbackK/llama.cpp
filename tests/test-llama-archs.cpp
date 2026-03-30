@@ -384,6 +384,9 @@ static bool arch_supported(const llm_arch arch) {
     if (arch == LLM_ARCH_PLM) {
         return false; // TODO tensor shapes
     }
+    if (arch == LLM_ARCH_DEEPSEEK2OCR) {
+        return false; // TODO tensor shapes
+    }
 
     // FIXME some models are segfaulting with WebGPU:
 #ifdef GGML_USE_WEBGPU
@@ -497,9 +500,6 @@ static int test_backends(const llm_arch target_arch, const size_t seed, const gg
         }
         dev_configs.emplace_back(devices, "Meta", LLAMA_SPLIT_MODE_TENSOR);
     }
-        if (arch == LLM_ARCH_DEEPSEEK2OCR) {
-            continue; // TODO tensor shapes
-        }
 
     bool all_ok = true;
     common_log_flush(common_log_main());
