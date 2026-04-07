@@ -103,7 +103,7 @@ void ggml_cuda_error(const char * stmt, const char * func, const char * file, in
 // with uninitialized thread contexts (see https://github.com/ggml-org/llama.cpp/issues/21140)
 void ggml_cuda_set_device(int device) {
     cudaError_t err = cudaSetDevice(device);
-    fprintf(stdout, TRACE_FN_PREFIX "Device: device=%d, result=%s\n", device, cudaGetErrorString(err));
+    fprintf(stdout, TRACE_FN_PREFIX "SetDevice: device=%d, result=%s\n", device, cudaGetErrorString(err));
     CUDA_CHECK(err);
 }
 
