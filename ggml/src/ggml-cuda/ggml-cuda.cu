@@ -63,6 +63,117 @@
 #include "ggml-cuda/fill.cuh"
 #include "ggml.h"
 
+// CUDA memory management tracing wrappers
+static cudaError_t ggml_cuda_malloc(void **ptr, size_t size) {
+    cudaError_t err = cudaMalloc(ptr, size);
+    if (err == cudaSuccess) {
+        fprintf(stderr, "cudaMalloc: ptr=%p, size=%zu, result=cudaSuccess\n", *ptr, size);
+    } else {
+        fprintf(stderr, "cudaMalloc: ptr=%p, size=%zu, result=%s\n", ptr, size, cudaGetErrorString(err));
+    }
+    return err;
+}
+
+static cudaError_t ggml_cuda_free(void *ptr) {
+    cudaError_t err = cudaFree(ptr);
+    fprintf(stderr, "cudaFree: ptr=%p, result=%s\n", ptr, cudaGetErrorString(err));
+    return err;
+}
+
+static cudaError_t ggml_cuda_malloc_managed(void **ptr, size_t size) {
+    cudaError_t err = cudaMallocManaged(ptr, size);
+    if (err == cudaSuccess) {
+        fprintf(stderr, "cudaMallocManaged: ptr=%p, size=%zu, result=cudaSuccess\n", *ptr, size);
+    } else {
+        fprintf(stderr, "cudaMallocManaged: ptr=%p, size=%zu, result=%s\n", ptr, size, cudaGetErrorString(err));
+    }
+    return err;
+}
+
+static cudaError_t ggml_cuda_host_alloc(void **ptr, size_t size) {
+    cudaError_t err = cudaMallocHost(ptr, size);
+    if (err == cudaSuccess) {
+        fprintf(stderr, "cudaMallocHost: ptr=%p, size=%zu, result=cudaSuccess\n", *ptr, size);
+    } else {
+        fprintf(stderr, "cudaMallocHost: ptr=%p, size=%zu, result=%s\n", ptr, size, cudaGetErrorString(err));
+    }
+    return err;
+}
+
+static cudaError_t ggml_cuda_host_free(void *ptr) {
+    cudaError_t err = cudaFreeHost(ptr);
+    fprintf(stderr, "cudaFreeHost: ptr=%p, result=%s\n", ptr, cudaGetErrorString(err));
+    return err;
+}
+
+static cudaError_t ggml_cuda_memcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
+    cudaError_t err = cudaMemcpy(dst, src, count, kind);
+    fprintf(stderr, "cudaMemcpy: dst=%p, src=%p, count=%zu, kind=%d, result=%s\n", 
+            dst, src, count, kind, cudaGetErrorString(err));
+    return err;
+}
+
+static cudaError_t ggml_cuda_memcpy_async(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {
+    cudaError_t err = cudaMemcpyAsync(dst, src, count, kind, stream);
+    fprintf(stderr, "cudaMemcpyAsync: dst=%p, src=%p, count=%zu, kind=%d, stream=%p, result=%s\n", 
+            dst, src, count, kind, (void*)stream, cudaGetErrorString(err));
+    return err;
+}
+
+static cudaError_t ggml_cuda_memcpy2d(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height, enum cudaMemcpyKind kind) {
+    cudaError_t err = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind);
+    fprintf(stderr, "cudaMemcpy2D: dst=%p, dpitch=%zu, src=%p, spitch=%zu, width=%zu, height=%zu, kind=%d, result=%s\n", 
+            dst, dpitch, src, spitch, width, height, kind, cudaGetErrorString(err));
+    return err;
+}
+
+static cudaError_t ggml_cuda_memcpy2d_async(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height, enum cudaMemcpyKind kind, cudaStream_t stream) {
+    cudaError_t err = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
+    fprintf(stderr, "cudaMemcpy2DAsync: dst=%p, dpitch=%zu, src=%p, spitch=%zu, width=%zu, height=%zu, kind=%d, stream=%p, result=%s\n", 
+            dst, dpitch, src, spitch, width, height, kind, (void*)stream, cudaGetErrorString(err));
+    return err;
+}
+
+static cudaError_t ggml_cuda_memcpy_peer_async(void *dst, int dstDevice, void *src, int srcDevice, size_t count, cudaStream_t stream) {
+    cudaError_t err = cudaMemcpyPeerAsync(dst, dstDevice, src, srcDevice, count, stream);
+    fprintf(stderr, "cudaMemcpyPeerAsync: dst=%p, dstDevice=%d, src=%p, srcDevice=%d, count=%zu, stream=%p, result=%s\n", 
+            dst, dstDevice, src, srcDevice, count, (void*)stream, cudaGetErrorString(err));
+    return err;
+}
+
+static cudaError_t ggml_cuda_memset(void *devPtr, int value, size_t count) {
+    cudaError_t err = cudaMemset(devPtr, value, count);
+    fprintf(stderr, "cudaMemset: devPtr=%p, value=%d, count=%zu, result=%s\n", 
+            devPtr, value, count, cudaGetErrorString(err));
+    return err;
+}
+
+static cudaError_t ggml_cuda_memset_async(void *devPtr, int value, size_t count, cudaStream_t stream) {
+    cudaError_t err = cudaMemsetAsync(devPtr, value, count, stream);
+    fprintf(stderr, "cudaMemsetAsync: devPtr=%p, value=%d, count=%zu, stream=%p, result=%s\n", 
+            devPtr, value, count, (void*)stream, cudaGetErrorString(err));
+    return err;
+}
+
+static cudaError_t ggml_cuda_host_register(void *ptr, size_t size) {
+    cudaError_t err = cudaHostRegister(ptr, size, 0);
+    fprintf(stderr, "cudaHostRegister: ptr=%p, size=%zu, result=%s\n", ptr, size, cudaGetErrorString(err));
+    return err;
+}
+
+static cudaError_t ggml_cuda_host_unregister(void *ptr) {
+    cudaError_t err = cudaHostUnregister(ptr);
+    fprintf(stderr, "cudaHostUnregister: ptr=%p, result=%s\n", ptr, cudaGetErrorString(err));
+    return err;
+}
+
+static cudaError_t ggml_cuda_memcpy3d_peer_async(cudaMemcpy3DPeerParms *p, cudaStream_t stream) {
+    cudaError_t err = cudaMemcpy3DPeerAsync(p, stream);
+    fprintf(stderr, "cudaMemcpy3DPeerAsync: dstDevice=%d, srcDevice=%d, extent=(%zu,%zu,%zu), stream=%p, result=%s\n", 
+            p->dstDevice, p->srcDevice, p->extent.width, p->extent.height, p->extent.depth, (void*)stream, cudaGetErrorString(err));
+    return err;
+}
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -114,7 +225,7 @@ static cudaError_t ggml_cuda_device_malloc(void ** ptr, size_t size, int device)
     ggml_cuda_set_device(device);
     cudaError_t err;
     if (getenv("GGML_CUDA_ENABLE_UNIFIED_MEMORY") != nullptr) {
-        err = cudaMallocManaged(ptr, size);
+        err = ggml_cuda_malloc_managed(ptr, size);
 #if defined(GGML_USE_HIP)
         if (err == hipSuccess) {
             // hipMemAdviseSetCoarseGrain is an optional performance hint;
@@ -131,11 +242,11 @@ static cudaError_t ggml_cuda_device_malloc(void ** ptr, size_t size, int device)
                 warned_unsupported = true;
             }
 
-            err = cudaMalloc(ptr, size);
+            err = ggml_cuda_malloc(ptr, size);
         }
 #endif // defined(GGML_USE_HIP)
     } else {
-        err = cudaMalloc(ptr, size);
+        err = ggml_cuda_malloc(ptr, size);
     }
     return err;
 }
@@ -372,7 +483,7 @@ struct ggml_cuda_pool_leg : public ggml_cuda_pool {
         for (int i = 0; i < MAX_BUFFERS; ++i) {
             ggml_cuda_buffer & b = buffer_pool[i];
             if (b.ptr != nullptr) {
-                CUDA_CHECK(cudaFree(b.ptr));
+                CUDA_CHECK(ggml_cuda_free(b.ptr));
                 pool_size -= b.size;
             }
         }
@@ -442,7 +553,7 @@ struct ggml_cuda_pool_leg : public ggml_cuda_pool {
         }
         GGML_LOG_DEBUG(GGML_CUDA_NAME " buffer pool full, increase MAX_CUDA_BUFFERS\n");
         ggml_cuda_set_device(device);
-        CUDA_CHECK(cudaFree(ptr));
+        CUDA_CHECK(ggml_cuda_free(ptr));
         pool_size -= size;
     }
 };
@@ -608,7 +719,7 @@ struct ggml_backend_cuda_buffer_context {
     }
 
     ~ggml_backend_cuda_buffer_context() {
-        CUDA_CHECK(cudaFree(dev_ptr));
+        CUDA_CHECK(ggml_cuda_free(dev_ptr));
     }
 };
 
@@ -878,7 +989,7 @@ struct ggml_backend_cuda_split_buffer_context {
                     }
                 }
                 if (extra->data_device[id] != nullptr) {
-                    CUDA_CHECK(cudaFree(extra->data_device[id]));
+                    CUDA_CHECK(ggml_cuda_free(extra->data_device[id]));
                 }
             }
             delete extra;
@@ -938,7 +1049,7 @@ static enum ggml_status ggml_backend_cuda_split_buffer_init_tensor(ggml_backend_
 
         // set padding to 0 to avoid possible NaN values
         if (size > original_size) {
-            CUDA_CHECK(cudaMemset(buf + original_size, 0, size - original_size));
+            CUDA_CHECK(ggml_cuda_memset(buf + original_size, 0, size - original_size));
         }
 
         extra->data_device[id] = buf;
@@ -1695,7 +1806,7 @@ static void ggml_cuda_op_mul_mat(
             const size_t nbytes_data    = ggml_nbytes(src0);
             const size_t nbytes_padding = ggml_row_size(src0->type, MATRIX_ROW_PADDING - ne00 % MATRIX_ROW_PADDING);
             dev[id].src0_dd = dev[id].src0_dd_alloc.alloc(ctx.pool(id), nbytes_data + nbytes_padding);
-            CUDA_CHECK(cudaMemsetAsync(dev[id].src0_dd, 0, nbytes_data + nbytes_padding, stream));
+            CUDA_CHECK(ggml_cuda_memset_async(dev[id].src0_dd, 0, nbytes_data + nbytes_padding, stream));
         }
 
         // If src0 is on a temporary compute buffer (partial offloading) there may be some padding that needs to be cleared:
