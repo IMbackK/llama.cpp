@@ -37,6 +37,8 @@
 #include "vendors/cuda.h"
 #endif // defined(GGML_USE_HIP)
 
+#include "cuda-wrappers.cuh"
+
 #define STRINGIZE_IMPL(...) #__VA_ARGS__
 #define STRINGIZE(...) STRINGIZE_IMPL(__VA_ARGS__)
 
@@ -1405,7 +1407,7 @@ struct ggml_backend_cuda_context {
     cudaStream_t stream(int device, int stream) {
         if (streams[device][stream] == nullptr) {
             ggml_cuda_set_device(device);
-            CUDA_CHECK(cudaStreamCreateWithFlags(&streams[device][stream], cudaStreamNonBlocking));
+            CUDA_CHECK(ggml_cuda_stream_create_with_flags(&streams[device][stream], cudaStreamNonBlocking));
         }
         return streams[device][stream];
     }

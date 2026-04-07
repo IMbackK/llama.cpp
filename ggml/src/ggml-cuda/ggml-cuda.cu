@@ -61,118 +61,8 @@
 #include "ggml-cuda/tri.cuh"
 #include "ggml-cuda/cumsum.cuh"
 #include "ggml-cuda/fill.cuh"
+#include "ggml-cuda/cuda-wrappers.cuh"
 #include "ggml.h"
-
-// CUDA memory management tracing wrappers
-static cudaError_t ggml_cuda_malloc(void **ptr, size_t size) {
-    cudaError_t err = cudaMalloc(ptr, size);
-    if (err == cudaSuccess) {
-        fprintf(stderr, "cudaMalloc: ptr=%p, size=%zu, result=cudaSuccess\n", *ptr, size);
-    } else {
-        fprintf(stderr, "cudaMalloc: ptr=%p, size=%zu, result=%s\n", ptr, size, cudaGetErrorString(err));
-    }
-    return err;
-}
-
-static cudaError_t ggml_cuda_free(void *ptr) {
-    cudaError_t err = cudaFree(ptr);
-    fprintf(stderr, "cudaFree: ptr=%p, result=%s\n", ptr, cudaGetErrorString(err));
-    return err;
-}
-
-static cudaError_t ggml_cuda_malloc_managed(void **ptr, size_t size) {
-    cudaError_t err = cudaMallocManaged(ptr, size);
-    if (err == cudaSuccess) {
-        fprintf(stderr, "cudaMallocManaged: ptr=%p, size=%zu, result=cudaSuccess\n", *ptr, size);
-    } else {
-        fprintf(stderr, "cudaMallocManaged: ptr=%p, size=%zu, result=%s\n", ptr, size, cudaGetErrorString(err));
-    }
-    return err;
-}
-
-static cudaError_t ggml_cuda_host_alloc(void **ptr, size_t size) {
-    cudaError_t err = cudaMallocHost(ptr, size);
-    if (err == cudaSuccess) {
-        fprintf(stderr, "cudaMallocHost: ptr=%p, size=%zu, result=cudaSuccess\n", *ptr, size);
-    } else {
-        fprintf(stderr, "cudaMallocHost: ptr=%p, size=%zu, result=%s\n", ptr, size, cudaGetErrorString(err));
-    }
-    return err;
-}
-
-static cudaError_t ggml_cuda_host_free(void *ptr) {
-    cudaError_t err = cudaFreeHost(ptr);
-    fprintf(stderr, "cudaFreeHost: ptr=%p, result=%s\n", ptr, cudaGetErrorString(err));
-    return err;
-}
-
-static cudaError_t ggml_cuda_memcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
-    cudaError_t err = cudaMemcpy(dst, src, count, kind);
-    fprintf(stderr, "cudaMemcpy: dst=%p, src=%p, count=%zu, kind=%d, result=%s\n", 
-            dst, src, count, kind, cudaGetErrorString(err));
-    return err;
-}
-
-static cudaError_t ggml_cuda_memcpy_async(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream) {
-    cudaError_t err = cudaMemcpyAsync(dst, src, count, kind, stream);
-    fprintf(stderr, "cudaMemcpyAsync: dst=%p, src=%p, count=%zu, kind=%d, stream=%p, result=%s\n", 
-            dst, src, count, kind, (void*)stream, cudaGetErrorString(err));
-    return err;
-}
-
-static cudaError_t ggml_cuda_memcpy2d(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height, enum cudaMemcpyKind kind) {
-    cudaError_t err = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind);
-    fprintf(stderr, "cudaMemcpy2D: dst=%p, dpitch=%zu, src=%p, spitch=%zu, width=%zu, height=%zu, kind=%d, result=%s\n", 
-            dst, dpitch, src, spitch, width, height, kind, cudaGetErrorString(err));
-    return err;
-}
-
-static cudaError_t ggml_cuda_memcpy2d_async(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height, enum cudaMemcpyKind kind, cudaStream_t stream) {
-    cudaError_t err = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
-    fprintf(stderr, "cudaMemcpy2DAsync: dst=%p, dpitch=%zu, src=%p, spitch=%zu, width=%zu, height=%zu, kind=%d, stream=%p, result=%s\n", 
-            dst, dpitch, src, spitch, width, height, kind, (void*)stream, cudaGetErrorString(err));
-    return err;
-}
-
-static cudaError_t ggml_cuda_memcpy_peer_async(void *dst, int dstDevice, void *src, int srcDevice, size_t count, cudaStream_t stream) {
-    cudaError_t err = cudaMemcpyPeerAsync(dst, dstDevice, src, srcDevice, count, stream);
-    fprintf(stderr, "cudaMemcpyPeerAsync: dst=%p, dstDevice=%d, src=%p, srcDevice=%d, count=%zu, stream=%p, result=%s\n", 
-            dst, dstDevice, src, srcDevice, count, (void*)stream, cudaGetErrorString(err));
-    return err;
-}
-
-static cudaError_t ggml_cuda_memset(void *devPtr, int value, size_t count) {
-    cudaError_t err = cudaMemset(devPtr, value, count);
-    fprintf(stderr, "cudaMemset: devPtr=%p, value=%d, count=%zu, result=%s\n", 
-            devPtr, value, count, cudaGetErrorString(err));
-    return err;
-}
-
-static cudaError_t ggml_cuda_memset_async(void *devPtr, int value, size_t count, cudaStream_t stream) {
-    cudaError_t err = cudaMemsetAsync(devPtr, value, count, stream);
-    fprintf(stderr, "cudaMemsetAsync: devPtr=%p, value=%d, count=%zu, stream=%p, result=%s\n", 
-            devPtr, value, count, (void*)stream, cudaGetErrorString(err));
-    return err;
-}
-
-static cudaError_t ggml_cuda_host_register(void *ptr, size_t size) {
-    cudaError_t err = cudaHostRegister(ptr, size, 0);
-    fprintf(stderr, "cudaHostRegister: ptr=%p, size=%zu, result=%s\n", ptr, size, cudaGetErrorString(err));
-    return err;
-}
-
-static cudaError_t ggml_cuda_host_unregister(void *ptr) {
-    cudaError_t err = cudaHostUnregister(ptr);
-    fprintf(stderr, "cudaHostUnregister: ptr=%p, result=%s\n", ptr, cudaGetErrorString(err));
-    return err;
-}
-
-static cudaError_t ggml_cuda_memcpy3d_peer_async(cudaMemcpy3DPeerParms *p, cudaStream_t stream) {
-    cudaError_t err = cudaMemcpy3DPeerAsync(p, stream);
-    fprintf(stderr, "cudaMemcpy3DPeerAsync: dstDevice=%d, srcDevice=%d, extent=(%zu,%zu,%zu), stream=%p, result=%s\n", 
-            p->dstDevice, p->srcDevice, p->extent.width, p->extent.height, p->extent.depth, (void*)stream, cudaGetErrorString(err));
-    return err;
-}
 
 #include <algorithm>
 #include <array>
@@ -212,7 +102,9 @@ void ggml_cuda_error(const char * stmt, const char * func, const char * file, in
 // always set device explicitly — early-return optimization is unsafe on ROCm multi-GPU
 // with uninitialized thread contexts (see https://github.com/ggml-org/llama.cpp/issues/21140)
 void ggml_cuda_set_device(int device) {
-    CUDA_CHECK(cudaSetDevice(device));
+    cudaError_t err = cudaSetDevice(device);
+    fprintf(stdout, TRACE_FN_PREFIX "Device: device=%d, result=%s\n", device, cudaGetErrorString(err));
+    CUDA_CHECK(err);
 }
 
 int ggml_cuda_get_device() {
@@ -752,7 +644,7 @@ static enum ggml_status ggml_backend_cuda_buffer_init_tensor(ggml_backend_buffer
 
         if (padded_size > original_size) {
             ggml_cuda_set_device(ctx->device);
-            CUDA_CHECK(cudaMemset((char *)tensor->data + original_size, 0, padded_size - original_size));
+            CUDA_CHECK(ggml_cuda_memset((char *)tensor->data + original_size, 0, padded_size - original_size));
         }
     }
     return GGML_STATUS_SUCCESS;
@@ -762,24 +654,24 @@ static void ggml_backend_cuda_buffer_memset_tensor(ggml_backend_buffer_t buffer,
     ggml_backend_cuda_buffer_context * ctx = (ggml_backend_cuda_buffer_context *) buffer->context;
 
     ggml_cuda_set_device(ctx->device);
-    CUDA_CHECK(cudaMemsetAsync((char *) tensor->data + offset, value, size, cudaStreamPerThread));
-    CUDA_CHECK(cudaStreamSynchronize(cudaStreamPerThread));
+    CUDA_CHECK(ggml_cuda_memset_async((char *) tensor->data + offset, value, size, cudaStreamPerThread));
+    CUDA_CHECK(ggml_cuda_stream_synchronize(cudaStreamPerThread));
 }
 
 static void ggml_backend_cuda_buffer_set_tensor(ggml_backend_buffer_t buffer, ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
     ggml_backend_cuda_buffer_context * ctx = (ggml_backend_cuda_buffer_context *) buffer->context;
 
     ggml_cuda_set_device(ctx->device);
-    CUDA_CHECK(cudaMemcpyAsync((char *) tensor->data + offset, data, size, cudaMemcpyHostToDevice, cudaStreamPerThread));
-    CUDA_CHECK(cudaStreamSynchronize(cudaStreamPerThread));
+    CUDA_CHECK(ggml_cuda_memcpy_async((char *) tensor->data + offset, data, size, cudaMemcpyHostToDevice, cudaStreamPerThread));
+    CUDA_CHECK(ggml_cuda_stream_synchronize(cudaStreamPerThread));
 }
 
 static void ggml_backend_cuda_buffer_get_tensor(ggml_backend_buffer_t buffer, const ggml_tensor * tensor, void * data, size_t offset, size_t size) {
     ggml_backend_cuda_buffer_context * ctx = (ggml_backend_cuda_buffer_context *) buffer->context;
 
     ggml_cuda_set_device(ctx->device);
-    CUDA_CHECK(cudaMemcpyAsync(data, (const char *) tensor->data + offset, size, cudaMemcpyDeviceToHost, cudaStreamPerThread));
-    CUDA_CHECK(cudaStreamSynchronize(cudaStreamPerThread));
+    CUDA_CHECK(ggml_cuda_memcpy_async(data, (const char *) tensor->data + offset, size, cudaMemcpyDeviceToHost, cudaStreamPerThread));
+    CUDA_CHECK(ggml_cuda_stream_synchronize(cudaStreamPerThread));
 }
 
 static void ggml_backend_cuda_buffer_set_tensor_2d(ggml_backend_buffer_t buffer, struct ggml_tensor * tensor, const void * data,
@@ -787,9 +679,9 @@ static void ggml_backend_cuda_buffer_set_tensor_2d(ggml_backend_buffer_t buffer,
     ggml_backend_cuda_buffer_context * ctx = (ggml_backend_cuda_buffer_context *) buffer->context;
 
     ggml_cuda_set_device(ctx->device);
-    CUDA_CHECK(cudaMemcpy2DAsync(
+    CUDA_CHECK(ggml_cuda_memcpy2d_async(
         (char *) tensor->data + offset, stride_tensor, data, stride_data, size, n_copies, cudaMemcpyHostToDevice, cudaStreamPerThread));
-    CUDA_CHECK(cudaStreamSynchronize(cudaStreamPerThread));
+    CUDA_CHECK(ggml_cuda_stream_synchronize(cudaStreamPerThread));
 }
 
 static void ggml_backend_cuda_buffer_get_tensor_2d(ggml_backend_buffer_t buffer, const struct ggml_tensor * tensor, void * data,
@@ -797,9 +689,9 @@ static void ggml_backend_cuda_buffer_get_tensor_2d(ggml_backend_buffer_t buffer,
     ggml_backend_cuda_buffer_context * ctx = (ggml_backend_cuda_buffer_context *)buffer->context;
 
     ggml_cuda_set_device(ctx->device);
-    CUDA_CHECK(cudaMemcpy2DAsync(
+    CUDA_CHECK(ggml_cuda_memcpy2d_async(
         data, stride_data, (const char *) tensor->data + offset, stride_tensor, size, n_copies, cudaMemcpyDeviceToHost, cudaStreamPerThread));
-    CUDA_CHECK(cudaStreamSynchronize(cudaStreamPerThread));
+    CUDA_CHECK(ggml_cuda_stream_synchronize(cudaStreamPerThread));
 }
 
 static bool ggml_backend_cuda_buffer_cpy_tensor(ggml_backend_buffer_t buffer, const ggml_tensor * src, ggml_tensor * dst) {
@@ -807,15 +699,15 @@ static bool ggml_backend_cuda_buffer_cpy_tensor(ggml_backend_buffer_t buffer, co
         ggml_backend_cuda_buffer_context * src_ctx = (ggml_backend_cuda_buffer_context *)src->buffer->context;
         ggml_backend_cuda_buffer_context * dst_ctx = (ggml_backend_cuda_buffer_context *)dst->buffer->context;
         if (src_ctx->device == dst_ctx->device) {
-            CUDA_CHECK(cudaMemcpyAsync(dst->data, src->data, ggml_nbytes(src), cudaMemcpyDeviceToDevice, cudaStreamPerThread));
+            CUDA_CHECK(ggml_cuda_memcpy_async(dst->data, src->data, ggml_nbytes(src), cudaMemcpyDeviceToDevice, cudaStreamPerThread));
         } else {
 #ifdef GGML_CUDA_NO_PEER_COPY
             return false;
 #else
-            CUDA_CHECK(cudaMemcpyPeerAsync(dst->data, dst_ctx->device, src->data, src_ctx->device, ggml_nbytes(src), cudaStreamPerThread));
+            CUDA_CHECK(ggml_cuda_memcpy_peer_async(dst->data, dst_ctx->device, src->data, src_ctx->device, ggml_nbytes(src), cudaStreamPerThread));
 #endif
         }
-        CUDA_CHECK(cudaStreamSynchronize(cudaStreamPerThread));
+        CUDA_CHECK(ggml_cuda_stream_synchronize(cudaStreamPerThread));
         return true;
     }
     return false;
@@ -827,8 +719,8 @@ static void ggml_backend_cuda_buffer_clear(ggml_backend_buffer_t buffer, uint8_t
     ggml_backend_cuda_buffer_context * ctx = (ggml_backend_cuda_buffer_context *)buffer->context;
 
     ggml_cuda_set_device(ctx->device);
-    CUDA_CHECK(cudaMemsetAsync(ctx->dev_ptr, value, buffer->size, cudaStreamPerThread));
-    CUDA_CHECK(cudaStreamSynchronize(cudaStreamPerThread));
+    CUDA_CHECK(ggml_cuda_memset_async(ctx->dev_ptr, value, buffer->size, cudaStreamPerThread));
+    CUDA_CHECK(ggml_cuda_stream_synchronize(cudaStreamPerThread));
 }
 
 static const ggml_backend_buffer_i ggml_backend_cuda_buffer_interface = {
@@ -1093,11 +985,11 @@ static void ggml_backend_cuda_split_buffer_set_tensor(ggml_backend_buffer_t buff
         }
 
         const char * buf_host = (const char *)data + offset_split;
-        CUDA_CHECK(cudaMemcpyAsync(extra->data_device[id], buf_host, original_size, cudaMemcpyHostToDevice, cudaStreamPerThread));
+        CUDA_CHECK(ggml_cuda_memcpy_async(extra->data_device[id], buf_host, original_size, cudaMemcpyHostToDevice, cudaStreamPerThread));
     }
 
     for (int id = 0; id < ggml_backend_cuda_get_device_count(); ++id) {
-        CUDA_CHECK(cudaStreamSynchronize(cudaStreamPerThread));
+        CUDA_CHECK(ggml_cuda_stream_synchronize(cudaStreamPerThread));
     }
 }
 
@@ -1132,11 +1024,11 @@ static void ggml_backend_cuda_split_buffer_get_tensor(ggml_backend_buffer_t buff
         }
 
         char * buf_host = (char *)data + offset_split;
-        CUDA_CHECK(cudaMemcpyAsync(buf_host, extra->data_device[id], original_size, cudaMemcpyDeviceToHost, cudaStreamPerThread));
+        CUDA_CHECK(ggml_cuda_memcpy_async(buf_host, extra->data_device[id], original_size, cudaMemcpyDeviceToHost, cudaStreamPerThread));
     }
 
     for (int id = 0; id < ggml_backend_cuda_get_device_count(); ++id) {
-        CUDA_CHECK(cudaStreamSynchronize(cudaStreamPerThread));
+        CUDA_CHECK(ggml_cuda_stream_synchronize(cudaStreamPerThread));
     }
 }
 
@@ -1362,7 +1254,7 @@ static bool ggml_backend_buft_is_cuda_host(ggml_backend_buffer_type_t buft) {
 }
 
 static void ggml_backend_cuda_host_buffer_free_buffer(ggml_backend_buffer_t buffer) {
-    CUDA_CHECK(cudaFreeHost(buffer->context));
+    CUDA_CHECK(ggml_cuda_host_free(buffer->context));
 }
 
 static void * ggml_cuda_host_malloc(size_t size) {
@@ -1451,15 +1343,15 @@ static cudaError_t ggml_cuda_cpy_tensor_2d(
 
     const char * x = src_ptr + i1_low*nb1 + i2*nb2 + i3*nb3;
     if (nb0 == ts && nb1 == ts*ne0/bs) {
-        return cudaMemcpyAsync(dst_ptr, x, i1_diff*nb1, cudaMemcpyDeviceToDevice, stream);
+        return ggml_cuda_memcpy_async(dst_ptr, x, i1_diff*nb1, cudaMemcpyDeviceToDevice, stream);
     } else if (nb0 == ts) {
-        return cudaMemcpy2DAsync(dst_ptr, ts*ne0/bs, x, nb1, ts*ne0/bs, i1_diff, cudaMemcpyDeviceToDevice, stream);
+        return ggml_cuda_memcpy2d_async(dst_ptr, ts*ne0/bs, x, nb1, ts*ne0/bs, i1_diff, cudaMemcpyDeviceToDevice, stream);
     } else {
         for (int64_t i1 = 0; i1 < i1_diff; i1++) {
             const void * rx = (const void *) ((const char *) x + i1*nb1);
             void * rd = (void *) (dst_ptr + i1*ts*ne0/bs);
             // pretend the row is a matrix with cols=1
-            cudaError_t r = cudaMemcpy2DAsync(rd, ts/bs, rx, nb0, ts/bs, ne0, cudaMemcpyDeviceToDevice, stream);
+            cudaError_t r = ggml_cuda_memcpy2d_async(rd, ts/bs, rx, nb0, ts/bs, ne0, cudaMemcpyDeviceToDevice, stream);
             if (r != cudaSuccess) {
                 return r;
             }
@@ -1669,7 +1561,7 @@ static cudaError_t ggml_cuda_Memcpy2DPeerAsync(
     // HIP does not support cudaMemcpy3DPeerAsync or vmm pools
     GGML_UNUSED(dstDevice);
     GGML_UNUSED(srcDevice);
-    return cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, cudaMemcpyDeviceToDevice, stream);
+    return ggml_cuda_memcpy2d_async(dst, dpitch, src, spitch, width, height, cudaMemcpyDeviceToDevice, stream);
 #endif // !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
 }
 
@@ -1815,7 +1707,7 @@ static void ggml_cuda_op_mul_mat(
             GGML_ASSERT(!src0->view_src);
             const size_t nbytes_data    = ggml_row_size(src0->type, (dev[id].row_high - dev[id].row_low)*ne00);
             const size_t nbytes_padding = ggml_row_size(src0->type, MATRIX_ROW_PADDING - ne00 % MATRIX_ROW_PADDING);
-            CUDA_CHECK(cudaMemsetAsync(dev[id].src0_dd + nbytes_data, 0, nbytes_padding, stream));
+            CUDA_CHECK(ggml_cuda_memset_async(dev[id].src0_dd + nbytes_data, 0, nbytes_padding, stream));
         }
 
         if (src1_on_device && src1_is_contiguous) {
@@ -1912,13 +1804,13 @@ static void ggml_cuda_op_mul_mat(
                                 const size_t height = src1_padded_col_size/(4*QK8_1);
                                 CUDA_CHECK(ggml_cuda_Memcpy2DPeerAsync(src1_ddq_i, id, pitch, src1_ddq_i_source, ctx.device, pitch, width, height, stream));
                             } else {
-                                CUDA_CHECK(cudaMemcpyPeerAsync(
+                                CUDA_CHECK(ggml_cuda_memcpy_peer_async(
                                     src1_ddq_i, id, src1_ddq_i_source, ctx.device, src1_ncols*src1_padded_col_size*q8_1_ts/q8_1_bs, stream));
                             }
                         } else {
                             float * src1_ddf_i_source = (float *) src1->data;
                             src1_ddf_i_source += (i0*ne11 + src1_col_0) * ne10;
-                            CUDA_CHECK(cudaMemcpyPeerAsync(src1_ddf_i, id, src1_ddf_i_source, ctx.device,
+                            CUDA_CHECK(ggml_cuda_memcpy_peer_async(src1_ddf_i, id, src1_ddf_i_source, ctx.device,
                                                             src1_ncols*ne10*sizeof(float), stream));
                         }
                     }
@@ -1964,7 +1856,7 @@ static void ggml_cuda_op_mul_mat(
                         float * dhf_dst_i = (float *) ((char *) dst_off_device + i02*nb2 + i03*nb3);
                         GGML_ASSERT(dst->nb[1] == ne0*sizeof(float));
                         dhf_dst_i += src1_col_0*ne0;
-                        CUDA_CHECK(cudaMemcpyAsync(dhf_dst_i, dst_dd_i, src1_ncols*ne0*sizeof(float), cudaMemcpyDeviceToDevice, stream));
+                        CUDA_CHECK(ggml_cuda_memcpy_async(dhf_dst_i, dst_dd_i, src1_ncols*ne0*sizeof(float), cudaMemcpyDeviceToDevice, stream));
                     }
                 }
 
@@ -2564,8 +2456,8 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor * 
     ggml_cuda_pool_alloc<char>  dst_sorted(ctx.pool(), ne2 *n_expert_used* ne0*ts_dst_sorted);
 
     std::vector<char> ids_host(ggml_nbytes(ids));
-    CUDA_CHECK(cudaMemcpyAsync(ids_host.data(), ids->data, ggml_nbytes(ids), cudaMemcpyDeviceToHost, stream));
-    CUDA_CHECK(cudaStreamSynchronize(stream));
+    CUDA_CHECK(ggml_cuda_memcpy_async(ids_host.data(), ids->data, ggml_nbytes(ids), cudaMemcpyDeviceToHost, stream));
+    CUDA_CHECK(ggml_cuda_stream_synchronize(stream));
 
     for (int64_t i02 = 0; i02 < ne02; ++i02) { // expert matrices
         for (int64_t i12 = 0; i12 < ne12; ++i12) { // tokens
@@ -2585,8 +2477,8 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor * 
 
     ids_to_sorted_host.insert(ids_to_sorted_host.end(), ids_from_sorted_host.begin(), ids_from_sorted_host.end());
 
-    CUDA_CHECK(cudaMemcpyAsync(ids_buf_dev.ptr, ids_to_sorted_host.data(), 2*ne_get_rows*sizeof(int32_t), cudaMemcpyHostToDevice, stream));
-    CUDA_CHECK(cudaStreamSynchronize(stream));
+    CUDA_CHECK(ggml_cuda_memcpy_async(ids_buf_dev.ptr, ids_to_sorted_host.data(), 2*ne_get_rows*sizeof(int32_t), cudaMemcpyHostToDevice, stream));
+    CUDA_CHECK(ggml_cuda_stream_synchronize(stream));
 
     const int32_t * ids_to_sorted   = ids_buf_dev.ptr + 0*ne_get_rows;
     const int32_t * ids_from_sorted = ids_buf_dev.ptr + 1*ne_get_rows;
@@ -3016,7 +2908,7 @@ static void ggml_backend_cuda_set_tensor_async(ggml_backend_t backend, ggml_tens
     GGML_ASSERT(buf->buft == ggml_backend_cuda_buffer_type(cuda_ctx->device) && "unsupported buffer type");
 
     ggml_cuda_set_device(cuda_ctx->device);
-    CUDA_CHECK(cudaMemcpyAsync((char *) tensor->data + offset, data, size, cudaMemcpyHostToDevice, cuda_ctx->stream()));
+    CUDA_CHECK(ggml_cuda_memcpy_async((char *) tensor->data + offset, data, size, cudaMemcpyHostToDevice, cuda_ctx->stream()));
 }
 
 static void ggml_backend_cuda_get_tensor_async(ggml_backend_t backend, const ggml_tensor * tensor, void * data, size_t offset, size_t size) {
@@ -3025,7 +2917,7 @@ static void ggml_backend_cuda_get_tensor_async(ggml_backend_t backend, const ggm
 
     GGML_ASSERT(buf->buft == ggml_backend_cuda_buffer_type(cuda_ctx->device) && "unsupported buffer type");
 
-    CUDA_CHECK(cudaMemcpyAsync(data, (const char *) tensor->data + offset, size, cudaMemcpyDeviceToHost, cuda_ctx->stream()));
+    CUDA_CHECK(ggml_cuda_memcpy_async(data, (const char *) tensor->data + offset, size, cudaMemcpyDeviceToHost, cuda_ctx->stream()));
 }
 
 static void ggml_backend_cuda_set_tensor_2d_async(ggml_backend_t backend, struct ggml_tensor * tensor, const void * data,
@@ -3035,7 +2927,7 @@ static void ggml_backend_cuda_set_tensor_2d_async(ggml_backend_t backend, struct
 
     GGML_ASSERT(buf->buft == ggml_backend_cuda_buffer_type(cuda_ctx->device) && "unsupported buffer type");
 
-    CUDA_CHECK(cudaMemcpy2DAsync(
+    CUDA_CHECK(ggml_cuda_memcpy2d_async(
         (char *) tensor->data + offset, stride_tensor, data, stride_data, size, n_copies, cudaMemcpyHostToDevice, cuda_ctx->stream()));
 }
 
@@ -3046,7 +2938,7 @@ static void ggml_backend_cuda_get_tensor_2d_async(ggml_backend_t backend, const 
 
     GGML_ASSERT(buf->buft == ggml_backend_cuda_buffer_type(cuda_ctx->device) && "unsupported buffer type");
 
-    CUDA_CHECK(cudaMemcpy2DAsync(
+    CUDA_CHECK(ggml_cuda_memcpy2d_async(
         data, stride_data, (const char *) tensor->data + offset, stride_tensor, size, n_copies, cudaMemcpyDeviceToHost, cuda_ctx->stream()));
 }
 
@@ -3079,12 +2971,12 @@ static bool ggml_backend_cuda_cpy_tensor_async(ggml_backend_t backend_src, ggml_
     if (backend_src != backend_dst) {
         // copy on src stream
         if (cuda_ctx_src->device == cuda_ctx_dst->device) {
-            CUDA_CHECK(cudaMemcpyAsync(dst->data, src->data, ggml_nbytes(dst), cudaMemcpyDeviceToDevice, cuda_ctx_src->stream()));
+            CUDA_CHECK(ggml_cuda_memcpy_async(dst->data, src->data, ggml_nbytes(dst), cudaMemcpyDeviceToDevice, cuda_ctx_src->stream()));
         } else {
 #ifdef GGML_CUDA_NO_PEER_COPY
             return false;
 #else
-            CUDA_CHECK(cudaMemcpyPeerAsync(dst->data, cuda_ctx_dst->device, src->data, cuda_ctx_src->device, ggml_nbytes(dst), cuda_ctx_src->stream()));
+            CUDA_CHECK(ggml_cuda_memcpy_peer_async(dst->data, cuda_ctx_dst->device, src->data, cuda_ctx_src->device, ggml_nbytes(dst), cuda_ctx_src->stream()));
 #endif // GGML_CUDA_NO_PEER_COPY
         }
 
@@ -3100,7 +2992,7 @@ static bool ggml_backend_cuda_cpy_tensor_async(ggml_backend_t backend_src, ggml_
         CUDA_CHECK(cudaStreamWaitEvent(cuda_ctx_dst->stream(), cuda_ctx_src->copy_event, 0));
     } else {
         // src and dst are on the same backend
-        CUDA_CHECK(cudaMemcpyAsync(dst->data, src->data, ggml_nbytes(dst), cudaMemcpyDeviceToDevice, cuda_ctx_src->stream()));
+        CUDA_CHECK(ggml_cuda_memcpy_async(dst->data, src->data, ggml_nbytes(dst), cudaMemcpyDeviceToDevice, cuda_ctx_src->stream()));
     }
     return true;
 }
@@ -3108,7 +3000,7 @@ static bool ggml_backend_cuda_cpy_tensor_async(ggml_backend_t backend_src, ggml_
 static void ggml_backend_cuda_synchronize(ggml_backend_t backend) {
     ggml_backend_cuda_context * cuda_ctx = (ggml_backend_cuda_context *)backend->context;
 
-    CUDA_CHECK(cudaStreamSynchronize(cuda_ctx->stream()));
+    CUDA_CHECK(ggml_cuda_stream_synchronize(cuda_ctx->stream()));
 
     GGML_UNUSED(backend);
 }
@@ -4667,7 +4559,7 @@ bool ggml_backend_cuda_register_host_buffer(void * buffer, size_t size) {
     }
 
 #if CUDART_VERSION >= 11010 || defined(GGML_USE_MUSA) || defined(GGML_USE_HIP)
-    cudaError_t err = cudaHostRegister(buffer, size, cudaHostRegisterPortable | cudaHostRegisterReadOnly);
+    cudaError_t err = ggml_cuda_host_register(buffer, size, cudaHostRegisterPortable | cudaHostRegisterReadOnly);
     if (err != cudaSuccess) {
         // clear the error
         (void)cudaGetLastError();
@@ -4689,7 +4581,7 @@ void ggml_backend_cuda_unregister_host_buffer(void * buffer) {
         return;
     }
 
-    cudaError_t err = cudaHostUnregister(buffer);
+    cudaError_t err = ggml_cuda_host_unregister(buffer);
     if (err != cudaSuccess) {
         // clear the error
         (void)cudaGetLastError();
