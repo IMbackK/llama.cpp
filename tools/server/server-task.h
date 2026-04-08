@@ -565,10 +565,11 @@ struct server_prompt_checkpoint {
 
     int64_t n_tokens;
 
-    std::vector<uint8_t> data;
+    uint8_t* data;
+    size_t size_;
 
     size_t size() const {
-        return data.size();
+        return size_;
     }
 };
 
