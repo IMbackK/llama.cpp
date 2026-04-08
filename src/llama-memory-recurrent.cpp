@@ -1032,7 +1032,9 @@ bool llama_memory_recurrent::state_read_data(llama_io_read_i & io, uint32_t cell
 
             if (cell_count) {
                 // Read and set the values for the whole cell range
+                fprintf(stderr, "%s: ggml_backend_tensor_set\n", __func__);
                 ggml_backend_tensor_set(s_l[il], io.read(cell_count * s_size_row), head * s_size_row, cell_count * s_size_row);
+                fprintf(stderr, "%s: ggml_backend_tensor_set return\n", __func__);
             }
         }
     } else {
