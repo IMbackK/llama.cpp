@@ -1125,6 +1125,11 @@ struct csv_printer : public printer {
             "test_mode",
             "backend_reg_name",
             "backend_name",
+            "time_us",
+            "flops",
+            "bandwidth_gb_s",
+            "memory_kb",
+            "n_runs",
         };
     }
 
